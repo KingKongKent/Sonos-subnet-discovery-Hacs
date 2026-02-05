@@ -1,0 +1,123 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Sonos",
+        "description": "Add Sonos speakers from a different subnet.",
+        "menu_options": {
+          "manual": "Enter IP addresses manually",
+          "scan": "Scan a subnet for devices"
+        }
+      },
+      "manual": {
+        "title": "Manual IP Entry",
+        "description": "Enter the IP addresses of your Sonos speakers (comma-separated).\n\nExample: {example}",
+        "data": {
+          "speaker_ips": "Speaker IP addresses"
+        }
+      },
+      "scan": {
+        "title": "Scan Subnet",
+        "description": "Enter the subnet to scan for Sonos devices.\n\nExample: {example}",
+        "data": {
+          "scan_subnet": "Subnet (CIDR notation)",
+          "scan_timeout": "Scan timeout (seconds)"
+        }
+      },
+      "select_devices": {
+        "title": "Select Devices",
+        "description": "Select the Sonos devices you want to add.",
+        "data": {
+          "selected_devices": "Devices"
+        }
+      },
+      "confirm": {
+        "title": "Confirm Setup",
+        "description": "The following {device_count} device(s) will be added:\n\n{device_list}"
+      }
+    },
+    "error": {
+      "no_ips": "Please enter at least one IP address",
+      "no_devices_found": "No Sonos devices found at the specified addresses",
+      "invalid_subnet": "Invalid subnet format. Use CIDR notation (e.g., 192.168.2.0/24)",
+      "already_configured": "This device is already configured"
+    },
+    "abort": {
+      "already_configured": "This Sonos system is already configured"
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Sonos Subnet Options",
+        "menu_options": {
+          "add_device": "Add a new device",
+          "remove_device": "Remove a device",
+          "scan_subnet": "Scan for new devices"
+        }
+      },
+      "add_device": {
+        "title": "Add Device",
+        "description": "Enter the IP address of the Sonos speaker to add.",
+        "data": {
+          "ip_address": "IP address"
+        }
+      },
+      "remove_device": {
+        "title": "Remove Device",
+        "description": "Select the device to remove.",
+        "data": {
+          "ip_address": "Device"
+        }
+      },
+      "scan_subnet": {
+        "title": "Scan Subnet",
+        "description": "Scan a subnet for new Sonos devices.",
+        "data": {
+          "scan_subnet": "Subnet (CIDR notation)",
+          "scan_timeout": "Scan timeout (seconds)"
+        }
+      },
+      "select_new_devices": {
+        "title": "Select New Devices",
+        "description": "Select the new devices to add.",
+        "data": {
+          "selected_devices": "Devices"
+        }
+      }
+    },
+    "error": {
+      "no_device_found": "No Sonos device found at this IP address",
+      "already_configured": "This device is already configured",
+      "invalid_ip": "Invalid IP address",
+      "invalid_subnet": "Invalid subnet format",
+      "no_new_devices": "No new devices found"
+    }
+  },
+  "services": {
+    "scan_subnet": {
+      "name": "Scan Subnet",
+      "description": "Scan a subnet for Sonos devices.",
+      "fields": {
+        "subnet": {
+          "name": "Subnet",
+          "description": "The subnet to scan in CIDR notation (e.g., 192.168.2.0/24)"
+        },
+        "timeout": {
+          "name": "Timeout",
+          "description": "Timeout for each device check in seconds"
+        }
+      }
+    },
+    "add_speaker": {
+      "name": "Add Speaker",
+      "description": "Add a Sonos speaker by IP address.",
+      "fields": {
+        "ip_address": {
+          "name": "IP Address",
+          "description": "The IP address of the Sonos speaker"
+        }
+      }
+    }
+  }
+}

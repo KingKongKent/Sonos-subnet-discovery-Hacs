@@ -1,0 +1,101 @@
+scan_subnet:
+  name: Scan Subnet
+  description: Scan a subnet for Sonos devices
+  fields:
+    subnet:
+      name: Subnet
+      description: The subnet to scan in CIDR notation (e.g., 192.168.2.0/24)
+      required: true
+      example: "192.168.2.0/24"
+      selector:
+        text:
+    timeout:
+      name: Timeout
+      description: Timeout for each device check in seconds
+      required: false
+      default: 5
+      example: 5
+      selector:
+        number:
+          min: 1
+          max: 30
+          step: 1
+          unit_of_measurement: seconds
+
+add_speaker:
+  name: Add Speaker
+  description: Add a Sonos speaker by IP address
+  fields:
+    ip_address:
+      name: IP Address
+      description: The IP address of the Sonos speaker
+      required: true
+      example: "192.168.2.100"
+      selector:
+        text:
+
+join:
+  name: Join Group
+  description: Join a Sonos speaker to a group with a master speaker
+  fields:
+    ip_address:
+      name: Speaker IP
+      description: The IP address of the speaker to join to the group
+      required: true
+      example: "192.168.2.101"
+      selector:
+        text:
+    master:
+      name: Master IP
+      description: The IP address of the master/coordinator speaker
+      required: true
+      example: "192.168.2.100"
+      selector:
+        text:
+
+unjoin:
+  name: Leave Group
+  description: Remove a Sonos speaker from its current group
+  fields:
+    ip_address:
+      name: Speaker IP
+      description: The IP address of the speaker to unjoin
+      required: true
+      example: "192.168.2.101"
+      selector:
+        text:
+
+set_sleep_timer:
+  name: Set Sleep Timer
+  description: Set a sleep timer on a Sonos speaker
+  fields:
+    ip_address:
+      name: Speaker IP
+      description: The IP address of the Sonos speaker
+      required: true
+      example: "192.168.2.100"
+      selector:
+        text:
+    sleep_time:
+      name: Duration
+      description: Sleep timer duration in seconds (1-7200)
+      required: true
+      example: 1800
+      selector:
+        number:
+          min: 1
+          max: 7200
+          step: 60
+          unit_of_measurement: seconds
+
+clear_sleep_timer:
+  name: Clear Sleep Timer
+  description: Clear the sleep timer on a Sonos speaker
+  fields:
+    ip_address:
+      name: Speaker IP
+      description: The IP address of the Sonos speaker
+      required: true
+      example: "192.168.2.100"
+      selector:
+        text:
