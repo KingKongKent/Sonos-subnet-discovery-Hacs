@@ -1,13 +1,13 @@
 {
   "domain": "sonos_subnet",
-  "name": "Sonos",
-  "codeowners": ["@your-github-username"],
+  "name": "Sonos (Subnet Discovery)",
+  "codeowners": ["@KingKongKent"],
   "config_flow": true,
   "dependencies": [],
-  "documentation": "https://github.com/your-username/sonos-subnet-hacs",
+  "documentation": "https://github.com/KingKongKent/Sonos-subnet-discovery-Hacs",
   "integration_type": "hub",
   "iot_class": "local_polling",
-  "issue_tracker": "https://github.com/your-username/sonos-subnet-hacs/issues",
+  "issue_tracker": "https://github.com/KingKongKent/Sonos-subnet-discovery-Hacs/issues",
   "loggers": ["sonos_subnet"],
   "requirements": ["aiohttp>=3.8.0"],
   "version": "1.0.0"
