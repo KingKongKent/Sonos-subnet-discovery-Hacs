@@ -241,6 +241,7 @@ This integration is not affiliated with or endorsed by Sonos, Inc. Sonos is a tr
 
 **Found this useful?** Consider supporting the project:
 
+[![Buy Me A Coffee](https://img.shields.io/badge/Buy%20Me%20A%20Coffee-Support-yellow.svg?logo=buy-me-a-coffee)](https://buymeacoffee.com/kingkongkent)
 [![PayPal](https://img.shields.io/badge/PayPal-Donate-blue.svg?logo=paypal)](https://www.paypal.com/paypalme/KingKongKent)
 [![GitHub stars](https://img.shields.io/github/stars/KingKongKent/Sonos-subnet-discovery-Hacs?style=social)](https://github.com/KingKongKent/Sonos-subnet-discovery-Hacs)
 
