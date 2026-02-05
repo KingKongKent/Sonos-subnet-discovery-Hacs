@@ -237,4 +237,11 @@ This integration is not affiliated with or endorsed by Sonos, Inc. Sonos is a tr
 
 ---
 
-**Found this useful?** ⭐ Star the repository on GitHub!
+## Support
+
+**Found this useful?** Consider supporting the project:
+
+[![PayPal](https://img.shields.io/badge/PayPal-Donate-blue.svg?logo=paypal)](https://www.paypal.com/paypalme/KingKongKent)
+[![GitHub stars](https://img.shields.io/github/stars/KingKongKent/Sonos-subnet-discovery-Hacs?style=social)](https://github.com/KingKongKent/Sonos-subnet-discovery-Hacs)
+
+⭐ Star the repository on GitHub!
