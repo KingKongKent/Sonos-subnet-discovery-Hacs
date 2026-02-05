@@ -1,8 +1,9 @@
 # Sonos Subnet Discovery
 
-[![hacs_badge](https://img.shields.io/badge/HACS-Custom-orange.svg)](https://github.com/hacs/integration)
-[![GitHub Release](https://img.shields.io/github/release/KingKongKent/Sonos-subnet-discovery-Hacs.svg)](https://github.com/KingKongKent/Sonos-subnet-discovery-Hacs/releases)
-[![License](https://img.shields.io/github/license/KingKongKent/Sonos-subnet-discovery-Hacs.svg)](LICENSE)
+[![hacs_badge](https://img.shields.io/badge/HACS-Custom-41BDF5.svg)](https://github.com/hacs/integration)
+[![GitHub release (latest by date)](https://img.shields.io/github/v/release/KingKongKent/Sonos-subnet-discovery-Hacs)](https://github.com/KingKongKent/Sonos-subnet-discovery-Hacs/releases/latest)
+[![GitHub](https://img.shields.io/github/license/KingKongKent/Sonos-subnet-discovery-Hacs)](LICENSE)
+[![GitHub issues](https://img.shields.io/github/issues/KingKongKent/Sonos-subnet-discovery-Hacs)](https://github.com/KingKongKent/Sonos-subnet-discovery-Hacs/issues)
 
 A Home Assistant custom integration for discovering and controlling Sonos speakers on **different subnets** than your Home Assistant installation.
 

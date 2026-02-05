@@ -1,7 +1,7 @@
 {
-  "name": "Sonos (Subnet Discovery)",
+  "name": "Sonos Subnet Discovery",
+  "hacs": "1.6.0",
   "homeassistant": "2024.1.0",
   "render_readme": true,
-  "zip_release": true,
-  "filename": "sonos_subnet.zip"
+  "content_in_root": false
 }
