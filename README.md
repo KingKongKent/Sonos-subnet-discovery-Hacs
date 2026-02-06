@@ -33,6 +33,8 @@ The built-in Sonos integration in Home Assistant relies on **multicast/SSDP disc
 | 🗑️ Clear Queue | Remove all tracks from queue |
 | 👥 Speaker Grouping | Native HA grouping (like Sonos app) |
 
+> ⚠️ **Known Issue:** The volume slider in the media player card does not work. Use the volume service call or automations instead.
+
 ### Sound Settings (Number Entities)
 | Entity | Range | Description |
 |--------|-------|-------------|

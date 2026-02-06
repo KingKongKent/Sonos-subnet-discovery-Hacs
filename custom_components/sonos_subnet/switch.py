@@ -71,9 +71,10 @@ class SonosBaseSwitch(CoordinatorEntity[SonosSubnetCoordinator], SwitchEntity):
         self._key = key
         self._icon_on = icon_on
         self._icon_off = icon_off
+        # Prefix unique_id to avoid collision with built-in Sonos integration
         self._base_unique_id = speaker_info.get("uuid") or speaker_info.get("serial_number") or ip_address
         
-        self._attr_unique_id = f"{self._base_unique_id}_{key}"
+        self._attr_unique_id = f"sonos_subnet_{self._base_unique_id}_{key}"
         self._attr_name = name
 
     @property

@@ -5,6 +5,8 @@ import asyncio
 import logging
 from typing import Any
 
+import soco
+
 from homeassistant.components.media_player import (
     MediaPlayerEntity,
     MediaPlayerEntityFeature,
@@ -31,6 +33,23 @@ from .coordinator import SonosSubnetCoordinator
 from .helpers import send_upnp_command, escape_xml
 
 _LOGGER = logging.getLogger(__name__)
+
+SUPPORTED_FEATURES = (
+    MediaPlayerEntityFeature.PAUSE
+    | MediaPlayerEntityFeature.PLAY
+    | MediaPlayerEntityFeature.STOP
+    | MediaPlayerEntityFeature.VOLUME_SET
+    | MediaPlayerEntityFeature.VOLUME_MUTE
+    | MediaPlayerEntityFeature.VOLUME_STEP
+    | MediaPlayerEntityFeature.PREVIOUS_TRACK
+    | MediaPlayerEntityFeature.NEXT_TRACK
+    | MediaPlayerEntityFeature.SHUFFLE_SET
+    | MediaPlayerEntityFeature.REPEAT_SET
+    | MediaPlayerEntityFeature.PLAY_MEDIA
+    | MediaPlayerEntityFeature.SEEK
+    | MediaPlayerEntityFeature.CLEAR_PLAYLIST
+    | MediaPlayerEntityFeature.GROUPING
+)
 
 
 async def async_setup_entry(
@@ -86,24 +105,18 @@ class SonosSubnetMediaPlayer(CoordinatorEntity[SonosSubnetCoordinator], MediaPla
         
         self._ip_address = ip_address
         self._speaker_info = speaker_info
-        self._attr_unique_id = speaker_info.get("uuid") or speaker_info.get("serial_number") or ip_address
+        # Base ID for device grouping (shared across all entity types)
+        self._device_id = speaker_info.get("uuid") or speaker_info.get("serial_number") or ip_address
+        # Prefix unique_id to avoid collision with built-in Sonos integration
+        self._attr_unique_id = f"sonos_subnet_{self._device_id}"
         
-        self._attr_supported_features = (
-            MediaPlayerEntityFeature.PAUSE
-            | MediaPlayerEntityFeature.PLAY
-            | MediaPlayerEntityFeature.STOP
-            | MediaPlayerEntityFeature.VOLUME_SET
-            | MediaPlayerEntityFeature.VOLUME_MUTE
-            | MediaPlayerEntityFeature.VOLUME_STEP
-            | MediaPlayerEntityFeature.PREVIOUS_TRACK
-            | MediaPlayerEntityFeature.NEXT_TRACK
-            | MediaPlayerEntityFeature.SHUFFLE_SET
-            | MediaPlayerEntityFeature.REPEAT_SET
-            | MediaPlayerEntityFeature.PLAY_MEDIA
-            | MediaPlayerEntityFeature.SEEK
-            | MediaPlayerEntityFeature.CLEAR_PLAYLIST
-            | MediaPlayerEntityFeature.GROUPING
-        )
+        # Create SoCo instance for direct speaker control
+        self._soco = soco.SoCo(ip_address)
+
+    @property
+    def supported_features(self) -> MediaPlayerEntityFeature:
+        """Flag media player features that are supported."""
+        return SUPPORTED_FEATURES
 
     @property
     def ip_address(self) -> str:
@@ -114,7 +127,7 @@ class SonosSubnetMediaPlayer(CoordinatorEntity[SonosSubnetCoordinator], MediaPla
     def device_info(self) -> DeviceInfo:
         """Return device info for this speaker."""
         return DeviceInfo(
-            identifiers={(DOMAIN, self._attr_unique_id)},
+            identifiers={(DOMAIN, self._device_id)},
             name=self._speaker_info.get("zone_name", f"Sonos ({self._ip_address})"),
             manufacturer="Sonos",
             model=self._speaker_info.get("model_name", "Unknown"),
@@ -254,31 +267,56 @@ class SonosSubnetMediaPlayer(CoordinatorEntity[SonosSubnetCoordinator], MediaPla
         _LOGGER.debug("Final group_members for %s: %s", self._ip_address, entity_ids)
         return entity_ids if entity_ids else None
 
-    # Transport Controls
+    # Transport Controls (via SoCo)
     async def async_media_play(self) -> None:
         """Send play command."""
         _LOGGER.info("Sending PLAY command to %s", self._ip_address)
-        await self._send_av_transport_command("Play", "<InstanceID>0</InstanceID><Speed>1</Speed>")
+        try:
+            await self.hass.async_add_executor_job(self._soco.play)
+        except Exception as exc:
+            _LOGGER.error("SoCo play failed for %s: %s", self._ip_address, exc)
+            return
+        await self.coordinator.async_request_refresh()
 
     async def async_media_pause(self) -> None:
         """Send pause command."""
         _LOGGER.info("Sending PAUSE command to %s", self._ip_address)
-        await self._send_av_transport_command("Pause", "<InstanceID>0</InstanceID>")
+        try:
+            await self.hass.async_add_executor_job(self._soco.pause)
+        except Exception as exc:
+            _LOGGER.error("SoCo pause failed for %s: %s", self._ip_address, exc)
+            return
+        await self.coordinator.async_request_refresh()
 
     async def async_media_stop(self) -> None:
         """Send stop command."""
         _LOGGER.info("Sending STOP command to %s", self._ip_address)
-        await self._send_av_transport_command("Stop", "<InstanceID>0</InstanceID>")
+        try:
+            await self.hass.async_add_executor_job(self._soco.stop)
+        except Exception as exc:
+            _LOGGER.error("SoCo stop failed for %s: %s", self._ip_address, exc)
+            return
+        await self.coordinator.async_request_refresh()
 
     async def async_media_next_track(self) -> None:
         """Send next track command."""
         _LOGGER.info("Sending NEXT command to %s", self._ip_address)
-        await self._send_av_transport_command("Next", "<InstanceID>0</InstanceID>")
+        try:
+            await self.hass.async_add_executor_job(self._soco.next)
+        except Exception as exc:
+            _LOGGER.error("SoCo next failed for %s: %s", self._ip_address, exc)
+            return
+        await self.coordinator.async_request_refresh()
 
     async def async_media_previous_track(self) -> None:
         """Send previous track command."""
         _LOGGER.info("Sending PREVIOUS command to %s", self._ip_address)
-        await self._send_av_transport_command("Previous", "<InstanceID>0</InstanceID>")
+        try:
+            await self.hass.async_add_executor_job(self._soco.previous)
+        except Exception as exc:
+            _LOGGER.error("SoCo previous failed for %s: %s", self._ip_address, exc)
+            return
+        await self.coordinator.async_request_refresh()
 
     async def async_media_seek(self, position: float) -> None:
         """Seek to a position."""
@@ -288,49 +326,78 @@ class SonosSubnetMediaPlayer(CoordinatorEntity[SonosSubnetCoordinator], MediaPla
         target = f"{hours}:{minutes:02d}:{seconds:02d}"
         
         _LOGGER.info("Seeking to %s on %s", target, self._ip_address)
-        await self._send_av_transport_command(
-            "Seek",
-            f"<InstanceID>0</InstanceID><Unit>REL_TIME</Unit><Target>{target}</Target>"
-        )
+        try:
+            await self.hass.async_add_executor_job(self._soco.seek, target)
+        except Exception as exc:
+            _LOGGER.error("SoCo seek failed for %s: %s", self._ip_address, exc)
+            return
+        await self.coordinator.async_request_refresh()
 
     async def async_clear_playlist(self) -> None:
         """Clear the queue."""
         _LOGGER.info("Clearing queue on %s", self._ip_address)
-        await self._send_av_transport_command(
-            "RemoveAllTracksFromQueue",
-            "<InstanceID>0</InstanceID>"
-        )
+        try:
+            await self.hass.async_add_executor_job(self._soco.clear_queue)
+        except Exception as exc:
+            _LOGGER.error("SoCo clear queue failed for %s: %s", self._ip_address, exc)
+            return
+        await self.coordinator.async_request_refresh()
 
-    # Volume Controls
+    # Volume Controls (via SoCo)
     async def async_set_volume_level(self, volume: float) -> None:
         """Set volume level (0..1)."""
         volume_percent = int(volume * 100)
-        _LOGGER.info("Setting volume to %d%% on %s", volume_percent, self._ip_address)
-        await self._send_rendering_command(
-            "SetVolume",
-            f"<InstanceID>0</InstanceID><Channel>Master</Channel><DesiredVolume>{volume_percent}</DesiredVolume>"
+        _LOGGER.warning(
+            "Setting volume to %d%% on %s (entity=%s, features=%s)",
+            volume_percent,
+            self._ip_address,
+            self.entity_id,
+            self.supported_features,
         )
+        try:
+            await self.hass.async_add_executor_job(
+                self._set_soco_volume, volume_percent
+            )
+        except Exception as exc:
+            _LOGGER.error("SoCo set volume failed for %s: %s", self._ip_address, exc)
+            return
+        # Optimistically update local state so the UI slider doesn't snap back
+        if self.coordinator.data and self._ip_address in self.coordinator.data:
+            self.coordinator.data[self._ip_address]["volume"] = volume_percent
+        self.async_write_ha_state()
+
+    def _set_soco_volume(self, volume: int) -> None:
+        """Set volume via SoCo (runs in executor)."""
+        self._soco.volume = volume
 
     async def async_volume_up(self) -> None:
         """Turn volume up."""
         current = self.volume_level or 0
-        await self.async_set_volume_level(min(1.0, current + 0.02))
+        await self.async_set_volume_level(min(1.0, current + 0.05))
 
     async def async_volume_down(self) -> None:
         """Turn volume down."""
         current = self.volume_level or 0
-        await self.async_set_volume_level(max(0.0, current - 0.02))
+        await self.async_set_volume_level(max(0.0, current - 0.05))
 
     async def async_mute_volume(self, mute: bool) -> None:
         """Mute the volume."""
-        mute_value = "1" if mute else "0"
         _LOGGER.info("Setting mute to %s on %s", mute, self._ip_address)
-        await self._send_rendering_command(
-            "SetMute",
-            f"<InstanceID>0</InstanceID><Channel>Master</Channel><DesiredMute>{mute_value}</DesiredMute>"
-        )
+        try:
+            await self.hass.async_add_executor_job(self._set_soco_mute, mute)
+        except Exception as exc:
+            _LOGGER.error("SoCo set mute failed for %s: %s", self._ip_address, exc)
+            return
+        # Optimistically update local state
+        if self.coordinator.data and self._ip_address in self.coordinator.data:
+            self.coordinator.data[self._ip_address]["mute"] = mute
+        self.async_write_ha_state()
 
-    # Shuffle/Repeat
+    def _set_soco_mute(self, mute: bool) -> None:
+        """Set mute via SoCo (runs in executor)."""
+        self._soco.mute = mute
+
+    # Shuffle/Repeat (via SoCo)
     async def async_set_shuffle(self, shuffle: bool) -> None:
         """Set shuffle mode."""
         current_repeat = self._speaker_data.get("repeat", False)
@@ -344,10 +411,17 @@ class SonosSubnetMediaPlayer(CoordinatorEntity[SonosSubnetCoordinator], MediaPla
             play_mode = "SHUFFLE_NOREPEAT" if shuffle else "NORMAL"
         
         _LOGGER.info("Setting play mode to %s on %s", play_mode, self._ip_address)
-        await self._send_av_transport_command(
-            "SetPlayMode",
-            f"<InstanceID>0</InstanceID><NewPlayMode>{play_mode}</NewPlayMode>"
-        )
+        try:
+            await self.hass.async_add_executor_job(
+                self._set_soco_play_mode, play_mode
+            )
+        except Exception:
+            # Fallback to UPnP
+            await self._send_av_transport_command(
+                "SetPlayMode",
+                f"<InstanceID>0</InstanceID><NewPlayMode>{play_mode}</NewPlayMode>"
+            )
+        await self.coordinator.async_request_refresh()
 
     async def async_set_repeat(self, repeat: RepeatMode) -> None:
         """Set repeat mode."""
@@ -361,10 +435,21 @@ class SonosSubnetMediaPlayer(CoordinatorEntity[SonosSubnetCoordinator], MediaPla
             play_mode = "SHUFFLE_NOREPEAT" if current_shuffle else "NORMAL"
         
         _LOGGER.info("Setting play mode to %s on %s", play_mode, self._ip_address)
-        await self._send_av_transport_command(
-            "SetPlayMode",
-            f"<InstanceID>0</InstanceID><NewPlayMode>{play_mode}</NewPlayMode>"
-        )
+        try:
+            await self.hass.async_add_executor_job(
+                self._set_soco_play_mode, play_mode
+            )
+        except Exception:
+            # Fallback to UPnP
+            await self._send_av_transport_command(
+                "SetPlayMode",
+                f"<InstanceID>0</InstanceID><NewPlayMode>{play_mode}</NewPlayMode>"
+            )
+        await self.coordinator.async_request_refresh()
+
+    def _set_soco_play_mode(self, mode: str) -> None:
+        """Set play mode via SoCo (runs in executor)."""
+        self._soco.play_mode = mode
 
     # Play Media
     async def async_play_media(
@@ -429,29 +514,32 @@ class SonosSubnetMediaPlayer(CoordinatorEntity[SonosSubnetCoordinator], MediaPla
     # Grouping Methods
     async def async_join_players(self, group_members: list[str]) -> None:
         """Join other players to this player (this player becomes coordinator)."""
-        _LOGGER.info("Joining players %s to %s", group_members, self.entity_id)
+        _LOGGER.warning("async_join_players CALLED! Master: %s, Members to join: %s", self.entity_id, group_members)
+        _LOGGER.warning("Master UUID: %s, Master IP: %s", self._speaker_info.get("uuid"), self._ip_address)
         
         # Get this speaker's UUID (master/coordinator)
         master_uuid = self._speaker_info.get("uuid", "")
         if not master_uuid:
-            _LOGGER.error("Cannot group: master speaker UUID not found")
+            _LOGGER.error("Cannot group: master speaker UUID not found for %s", self.entity_id)
             return
         
         coordinator_uri = f"x-rincon:{master_uuid}"
+        _LOGGER.warning("Coordinator URI: %s", coordinator_uri)
         
         # Join each member to this coordinator
         for member_entity_id in group_members:
             # Skip if trying to join to itself
             if member_entity_id == self.entity_id:
+                _LOGGER.debug("Skipping self: %s", member_entity_id)
                 continue
             
             # Convert entity_id to IP
             member_ip = self.coordinator.get_ip_from_entity_id(member_entity_id)
             if not member_ip:
-                _LOGGER.warning("Could not find IP for entity %s", member_entity_id)
+                _LOGGER.error("Could not find IP for entity %s", member_entity_id)
                 continue
             
-            _LOGGER.info("Joining %s to coordinator %s", member_entity_id, self.entity_id)
+            _LOGGER.warning("Joining %s (%s) to coordinator %s (%s)", member_entity_id, member_ip, self.entity_id, self._ip_address)
             
             success, _ = await send_upnp_command(
                 member_ip,
@@ -469,7 +557,7 @@ class SonosSubnetMediaPlayer(CoordinatorEntity[SonosSubnetCoordinator], MediaPla
 
     async def async_unjoin_player(self) -> None:
         """Unjoin this player from its group."""
-        _LOGGER.info("Unjoining %s from group", self.entity_id)
+        _LOGGER.warning("async_unjoin_player CALLED! Entity: %s, IP: %s", self.entity_id, self._ip_address)
         
         success, _ = await send_upnp_command(
             self._ip_address,
