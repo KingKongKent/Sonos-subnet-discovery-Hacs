@@ -38,16 +38,34 @@ join:
   name: Join Group
   description: Join a Sonos speaker to a group with a master speaker
   fields:
+    entity_id:
+      name: Speaker Entity
+      description: The entity_id of the speaker to join to the group
+      required: false
+      example: "media_player.bedroom"
+      selector:
+        entity:
+          domain: media_player
+          integration: sonos_subnet
+    master_entity_id:
+      name: Master Entity
+      description: The entity_id of the master/coordinator speaker
+      required: false
+      example: "media_player.living_room"
+      selector:
+        entity:
+          domain: media_player
+          integration: sonos_subnet
     ip_address:
-      name: Speaker IP
-      description: The IP address of the speaker to join to the group
-      required: true
+      name: Speaker IP (deprecated)
+      description: The IP address of the speaker to join to the group (use entity_id instead)
+      required: false
       example: "192.168.2.101"
       selector:
         text:
     master:
-      name: Master IP
-      description: The IP address of the master/coordinator speaker
+      name: Master IP (deprecated)
+      description: The IP address of the master/coordinator speaker (use master_entity_id instead)
       required: true
       example: "192.168.2.100"
       selector:
@@ -57,9 +75,18 @@ unjoin:
   name: Leave Group
   description: Remove a Sonos speaker from its current group
   fields:
+    entity_id:
+      name: Speaker Entity
+      description: The entity_id of the speaker to unjoin
+      required: false
+      example: "media_player.bedroom"
+      selector:
+        entity:
+          domain: media_player
+          integration: sonos_subnet
     ip_address:
-      name: Speaker IP
-      description: The IP address of the speaker to unjoin
+      name: Speaker IP (deprecated)
+      description: The IP address of the speaker to unjoin (use entity_id instead)
       required: true
       example: "192.168.2.101"
       selector:

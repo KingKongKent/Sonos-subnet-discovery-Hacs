@@ -121,11 +121,19 @@ def parse_didl_metadata(didl: str) -> dict[str, Any]:
     # Unescape HTML entities
     didl = didl.replace("&lt;", "<").replace("&gt;", ">").replace("&quot;", '"').replace("&amp;", "&")
     
-    # Extract track info
+    # Extract basic track info
     metadata["title"] = extract_xml_value(didl, "dc:title")
     metadata["artist"] = extract_xml_value(didl, "dc:creator")
     metadata["album"] = extract_xml_value(didl, "upnp:album")
     metadata["album_art"] = extract_xml_value(didl, "upnp:albumArtURI")
+    
+    # Extract streaming radio specific metadata
+    metadata["stream_content"] = extract_xml_value(didl, "r:streamContent")
+    metadata["radio_show"] = extract_xml_value(didl, "r:radioShowMd")
+    
+    # If no album art, try alternative fields
+    if not metadata["album_art"]:
+        metadata["album_art"] = extract_xml_value(didl, "upnp:icon") or extract_xml_value(didl, "albumArtURI")
     
     # Extract duration
     duration_str = extract_xml_value(didl, "res")

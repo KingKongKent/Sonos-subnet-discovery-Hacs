@@ -112,6 +112,7 @@ class SonosSubnetCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         volume_task = self._get_volume_info(ip)
         eq_task = self._get_eq_info(ip)
         device_settings_task = self._get_device_settings(ip)
+        zone_group_task = self._get_zone_group_info(ip)
         
         results = await asyncio.gather(
             transport_task,
@@ -119,6 +120,7 @@ class SonosSubnetCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             volume_task,
             eq_task,
             device_settings_task,
+            zone_group_task,
             return_exceptions=True,
         )
         
@@ -190,7 +192,8 @@ class SonosSubnetCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             data["track_number"] = extract_xml_value_int(response, "Track")
             data["track_duration"] = parse_duration(extract_xml_value(response, "TrackDuration") or "")
             data["track_position"] = parse_duration(extract_xml_value(response, "RelTime") or "")
-            data["track_uri"] = extract_xml_value(response, "TrackURI")
+            track_uri = extract_xml_value(response, "TrackURI") or ""
+            data["track_uri"] = track_uri
             
             # Parse track metadata
             metadata_raw = extract_xml_value(response, "TrackMetaData")
@@ -200,6 +203,18 @@ class SonosSubnetCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 data["track_artist"] = metadata.get("artist")
                 data["track_album"] = metadata.get("album")
                 data["album_art_uri"] = metadata.get("album_art")
+                
+                # Fallback: If no title and it's a stream, try to get stream info
+                if not data.get("track_title") and ("http" in track_uri or "x-rincon-mp3radio" in track_uri or "x-sonosapi-stream" in track_uri):
+                    # For streaming services, try additional fields
+                    stream_info = extract_xml_value(response, "StreamContent") or metadata.get("stream_content")
+                    if stream_info:
+                        data["track_title"] = stream_info
+                    
+                    # Try to get radio show name
+                    radio_show = metadata.get("radio_show") or extract_xml_value(metadata_raw, "r:streamContent")
+                    if radio_show and not data.get("track_artist"):
+                        data["track_artist"] = radio_show
         
         return data
 
@@ -345,3 +360,94 @@ class SonosSubnetCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             new_data = dict(self.entry.data)
             new_data[CONF_SPEAKER_IPS] = self._speaker_ips
             self.hass.config_entries.async_update_entry(self.entry, data=new_data)
+
+    async def _get_zone_group_info(self, ip: str) -> dict[str, Any]:
+        """Get zone group topology to detect grouping."""
+        data = {"group_members": [], "is_coordinator": True}
+        
+        success, response = await send_upnp_command(
+            ip,
+            "urn:schemas-upnp-org:service:ZoneGroupTopology:1",
+            "GetZoneGroupState",
+            "",
+            "/ZoneGroupTopology/Control",
+        )
+        
+        if not success:
+            _LOGGER.debug("Failed to get zone group state for %s", ip)
+            return data
+        
+        try:
+            import re
+            
+            # Get this speaker's UUID
+            speaker_uuid = None
+            for speaker_ip, speaker_info in self._speakers.items():
+                if speaker_ip == ip:
+                    speaker_uuid = speaker_info.get("uuid")
+                    break
+            
+            if not speaker_uuid:
+                _LOGGER.debug("No UUID found for speaker %s", ip)
+                return data
+            
+            # Extract ZoneGroupState
+            state_match = re.search(r'<ZoneGroupState>(.*?)</ZoneGroupState>', response, re.DOTALL)
+            if not state_match:
+                _LOGGER.debug("No ZoneGroupState found in response for %s", ip)
+                return data
+            
+            zone_state = state_match.group(1)
+            # Unescape XML entities
+            zone_state = zone_state.replace("&lt;", "<").replace("&gt;", ">").replace("&quot;", '"').replace("&amp;", "&")
+            
+            _LOGGER.debug("Zone state for %s: %s", ip, zone_state[:500])
+            
+            # Find all ZoneGroups
+            zone_groups = re.findall(r'<ZoneGroup([^>]*)>(.*?)</ZoneGroup>', zone_state, re.DOTALL)
+            
+            for group_attrs, group_content in zone_groups:
+                # Get coordinator UUID from ZoneGroup attributes
+                coordinator_match = re.search(r'Coordinator="([^"]+)"', group_attrs)
+                if not coordinator_match:
+                    continue
+                
+                coordinator_uuid = coordinator_match.group(1)
+                
+                # Get all members in this group
+                member_pattern = r'<ZoneGroupMember[^>]*UUID="([^"]+)"[^>]*Location="http://([^:]+):'
+                members = re.findall(member_pattern, group_content)
+                
+                _LOGGER.debug("Found group with coordinator %s, members: %s", coordinator_uuid, members)
+                
+                # Check if this speaker is in this group
+                speaker_in_group = False
+                for member_uuid, member_ip in members:
+                    if member_uuid == speaker_uuid or member_ip == ip:
+                        speaker_in_group = True
+                        break
+                
+                if speaker_in_group:
+                    # This is our speaker's group
+                    group_member_ips = [m_ip for _, m_ip in members]
+                    data["group_members"] = group_member_ips
+                    data["is_coordinator"] = (coordinator_uuid == speaker_uuid)
+                    
+                    _LOGGER.debug("Speaker %s is in group: %s, is_coordinator: %s", 
+                                ip, group_member_ips, data["is_coordinator"])
+                    break
+            
+        except Exception as err:
+            _LOGGER.error("Error parsing zone group state for %s: %s", ip, err)
+        
+        return data
+
+    def get_ip_from_entity_id(self, entity_id: str) -> str | None:
+        """Convert entity_id to IP address."""
+        for ip, info in self._speakers.items():
+            zone_name = info.get("zone_name", "")
+            # Create entity_id from zone_name
+            expected_id = f"media_player.{zone_name.lower().replace(' ', '_')}"
+            if expected_id == entity_id:
+                return ip
+        return None

@@ -102,6 +102,7 @@ class SonosSubnetMediaPlayer(CoordinatorEntity[SonosSubnetCoordinator], MediaPla
             | MediaPlayerEntityFeature.PLAY_MEDIA
             | MediaPlayerEntityFeature.SEEK
             | MediaPlayerEntityFeature.CLEAR_PLAYLIST
+            | MediaPlayerEntityFeature.GROUPING
         )
 
     @property
@@ -182,7 +183,17 @@ class SonosSubnetMediaPlayer(CoordinatorEntity[SonosSubnetCoordinator], MediaPla
     @property
     def media_title(self) -> str | None:
         """Return the title of current playing media."""
-        return self._speaker_data.get("track_title")
+        title = self._speaker_data.get("track_title")
+        
+        # Fallback: If no title, try to parse from URI for streaming radio
+        if not title:
+            track_uri = self._speaker_data.get("track_uri", "")
+            if track_uri:
+                # Don't show raw URIs, return None instead so HA can handle it
+                if track_uri.startswith(("http://", "https://", "x-rincon", "x-sonos")):
+                    return None
+        
+        return title
 
     @property
     def media_artist(self) -> str | None:
@@ -218,6 +229,30 @@ class SonosSubnetMediaPlayer(CoordinatorEntity[SonosSubnetCoordinator], MediaPla
     def media_track(self) -> int | None:
         """Return the track number of current playing media."""
         return self._speaker_data.get("track_number")
+
+    @property
+    def group_members(self) -> list[str] | None:
+        """Return list of entity_ids of group members."""
+        member_ips = self._speaker_data.get("group_members", [])
+        
+        _LOGGER.debug("Speaker %s group_members from data: %s", self._ip_address, member_ips)
+        
+        if not member_ips or len(member_ips) <= 1:
+            return None
+        
+        # Convert IPs to entity_ids
+        entity_ids = []
+        for ip in member_ips:
+            if ip in self.coordinator.speakers:
+                info = self.coordinator.speakers[ip]
+                zone_name = info.get("zone_name", "")
+                if zone_name:
+                    entity_id = f"media_player.{zone_name.lower().replace(' ', '_')}"
+                    entity_ids.append(entity_id)
+                    _LOGGER.debug("Mapped IP %s to entity %s", ip, entity_id)
+        
+        _LOGGER.debug("Final group_members for %s: %s", self._ip_address, entity_ids)
+        return entity_ids if entity_ids else None
 
     # Transport Controls
     async def async_media_play(self) -> None:
@@ -390,6 +425,64 @@ class SonosSubnetMediaPlayer(CoordinatorEntity[SonosSubnetCoordinator], MediaPla
         if success:
             await self.coordinator.async_request_refresh()
         return success
+
+    # Grouping Methods
+    async def async_join_players(self, group_members: list[str]) -> None:
+        """Join other players to this player (this player becomes coordinator)."""
+        _LOGGER.info("Joining players %s to %s", group_members, self.entity_id)
+        
+        # Get this speaker's UUID (master/coordinator)
+        master_uuid = self._speaker_info.get("uuid", "")
+        if not master_uuid:
+            _LOGGER.error("Cannot group: master speaker UUID not found")
+            return
+        
+        coordinator_uri = f"x-rincon:{master_uuid}"
+        
+        # Join each member to this coordinator
+        for member_entity_id in group_members:
+            # Skip if trying to join to itself
+            if member_entity_id == self.entity_id:
+                continue
+            
+            # Convert entity_id to IP
+            member_ip = self.coordinator.get_ip_from_entity_id(member_entity_id)
+            if not member_ip:
+                _LOGGER.warning("Could not find IP for entity %s", member_entity_id)
+                continue
+            
+            _LOGGER.info("Joining %s to coordinator %s", member_entity_id, self.entity_id)
+            
+            success, _ = await send_upnp_command(
+                member_ip,
+                UPNP_AV_TRANSPORT,
+                "SetAVTransportURI",
+                f"<InstanceID>0</InstanceID><CurrentURI>{coordinator_uri}</CurrentURI><CurrentURIMetaData></CurrentURIMetaData>",
+                CONTROL_AV_TRANSPORT,
+            )
+            
+            if not success:
+                _LOGGER.error("Failed to join %s to group", member_entity_id)
+        
+        # Request refresh after grouping
+        await self.coordinator.async_request_refresh()
+
+    async def async_unjoin_player(self) -> None:
+        """Unjoin this player from its group."""
+        _LOGGER.info("Unjoining %s from group", self.entity_id)
+        
+        success, _ = await send_upnp_command(
+            self._ip_address,
+            UPNP_AV_TRANSPORT,
+            "BecomeCoordinatorOfStandaloneGroup",
+            "<InstanceID>0</InstanceID>",
+            CONTROL_AV_TRANSPORT,
+        )
+        
+        if success:
+            await self.coordinator.async_request_refresh()
+        else:
+            _LOGGER.error("Failed to unjoin %s from group", self.entity_id)
 
     @callback
     def _handle_coordinator_update(self) -> None:

@@ -10,5 +10,5 @@
   "issue_tracker": "https://github.com/KingKongKent/Sonos-subnet-discovery-Hacs/issues",
   "loggers": ["sonos_subnet"],
   "requirements": ["aiohttp>=3.8.0"],
-  "version": "1.0.1"
+  "version": "1.1.0"
 }

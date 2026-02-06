@@ -48,12 +48,15 @@ SERVICE_ADD_SPEAKER_SCHEMA = vol.Schema({
 })
 
 SERVICE_JOIN_SCHEMA = vol.Schema({
-    vol.Required(ATTR_IP_ADDRESS): str,
-    vol.Required(ATTR_MASTER): str,
+    vol.Optional(ATTR_IP_ADDRESS): str,
+    vol.Optional(ATTR_MASTER): str,
+    vol.Optional("entity_id"): str,
+    vol.Optional("master_entity_id"): str,
 })
 
 SERVICE_UNJOIN_SCHEMA = vol.Schema({
-    vol.Required(ATTR_IP_ADDRESS): str,
+    vol.Optional(ATTR_IP_ADDRESS): str,
+    vol.Optional("entity_id"): str,
 })
 
 SERVICE_SLEEP_TIMER_SCHEMA = vol.Schema({
@@ -127,17 +130,36 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     # Join/Unjoin services for grouping
     async def handle_join(call: ServiceCall) -> None:
         """Handle the join service call - group a speaker with a master."""
-        ip_address = call.data[ATTR_IP_ADDRESS]
-        master_ip = call.data[ATTR_MASTER]
+        ip_address = call.data.get(ATTR_IP_ADDRESS)
+        master = call.data.get(ATTR_MASTER)
+        entity_id = call.data.get("entity_id")
+        master_entity_id = call.data.get("master_entity_id")
         
-        _LOGGER.info("Joining %s to master %s", ip_address, master_ip)
+        # Support both entity_id and IP address
+        if entity_id:
+            ip_address = coordinator.get_ip_from_entity_id(entity_id)
+            if not ip_address:
+                _LOGGER.error("Entity %s not found", entity_id)
+                return
+        
+        if master_entity_id:
+            master = coordinator.get_ip_from_entity_id(master_entity_id)
+            if not master:
+                _LOGGER.error("Master entity %s not found", master_entity_id)
+                return
+        
+        if not ip_address or not master:
+            _LOGGER.error("Both speaker and master must be specified")
+            return
+        
+        _LOGGER.info("Joining %s to master %s", ip_address, master)
         
         # Get master's coordinator URI
-        master_data = coordinator.speakers.get(master_ip, {})
+        master_data = coordinator.speakers.get(master, {})
         master_uuid = master_data.get("uuid", "")
         
         if not master_uuid:
-            _LOGGER.error("Master speaker %s not found", master_ip)
+            _LOGGER.error("Master speaker %s not found", master)
             return
         
         coordinator_uri = f"x-rincon:{master_uuid}"
@@ -155,7 +177,19 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
     async def handle_unjoin(call: ServiceCall) -> None:
         """Handle the unjoin service call - remove speaker from group."""
-        ip_address = call.data[ATTR_IP_ADDRESS]
+        ip_address = call.data.get(ATTR_IP_ADDRESS)
+        entity_id = call.data.get("entity_id")
+        
+        # Support both entity_id and IP address
+        if entity_id:
+            ip_address = coordinator.get_ip_from_entity_id(entity_id)
+            if not ip_address:
+                _LOGGER.error("Entity %s not found", entity_id)
+                return
+        
+        if not ip_address:
+            _LOGGER.error("Speaker must be specified")
+            return
         
         _LOGGER.info("Unjoining %s from group", ip_address)
         

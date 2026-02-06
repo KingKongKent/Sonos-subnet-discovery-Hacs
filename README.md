@@ -7,6 +7,8 @@
 
 A Home Assistant custom integration for discovering and controlling Sonos speakers on **different subnets** than your Home Assistant installation.
 
+> **🎉 Version 1.1.0** - Now with **native Home Assistant grouping** that syncs with the Sonos app!
+
 ## Why This Integration?
 
 The built-in Sonos integration in Home Assistant relies on **multicast/SSDP discovery**, which doesn't work across different subnets or VLANs. This integration solves that problem by:
@@ -29,6 +31,7 @@ The built-in Sonos integration in Home Assistant relies on **multicast/SSDP disc
 | ⏱️ Seek | Jump to position in track |
 | 🎶 Play Media | Play audio URLs directly |
 | 🗑️ Clear Queue | Remove all tracks from queue |
+| 👥 Speaker Grouping | Native HA grouping (like Sonos app) |
 
 ### Sound Settings (Number Entities)
 | Entity | Range | Description |
@@ -147,6 +150,23 @@ data:
 ```
 
 ### Group Speakers
+
+**Using Native Home Assistant UI:**
+1. Open any Sonos speaker card in Home Assistant
+2. Click the **"⋮" menu** (three dots)
+3. Select **"Group with"** 
+4. Choose which speakers to add to the group
+5. Done! Changes sync with Sonos app instantly
+
+**Using Services (Entity-based - Recommended):**
+```yaml
+service: sonos_subnet.join
+data:
+  entity_id: media_player.bedroom      # Speaker to join
+  master_entity_id: media_player.living_room  # Master/coordinator
+```
+
+**Using Services (IP-based - Legacy):**
 ```yaml
 service: sonos_subnet.join
 data:
@@ -155,11 +175,27 @@ data:
 ```
 
 ### Ungroup Speaker
+
+**Using Native Home Assistant UI:**
+1. Open the grouped speaker card
+2. Click **"⋮" menu**
+3. Select **"Ungroup"**
+
+**Using Services (Entity-based - Recommended):**
+```yaml
+service: sonos_subnet.unjoin
+data:
+  entity_id: media_player.bedroom
+```
+
+**Using Services (IP-based - Legacy):**
 ```yaml
 service: sonos_subnet.unjoin
 data:
   ip_address: "192.168.2.101"
 ```
+
+> **💡 Tip:** Grouping changes made in the Sonos app will automatically sync to Home Assistant within 10 seconds!
 
 ### Set Sleep Timer (30 minutes)
 ```yaml
